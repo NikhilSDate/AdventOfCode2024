@@ -35,16 +35,18 @@ pub fn build_graph(map: Vec<Vec<char>>) -> Map {
     let mut indices: HashMap<(usize, usize), NodeIndex> = HashMap::new();
     let mut start = (0, 0);
     let mut end = (0, 0);
+    let mut map = map.clone();
     for i in 0..map.len() {
         for j in 0..map[0].len() {
-            if map[i][j] == '.' || map[i][j] == 'S' || map[i][j] == 'E' {
-                indices.insert((i, j), g.add_node((i, j)));
-            }
             if map[i][j] == 'S' {
                 start = (i, j);
             }
             if map[i][j] == 'E' {
                 end = (i, j);                
+            }
+            if map[i][j] == '.' || map[i][j] == 'S' || map[i][j] == 'E' {
+                indices.insert((i, j), g.add_node((i, j)));
+                map[i][j] = '.';
             }
         }
     }
@@ -83,14 +85,32 @@ pub fn run_search(map: &Map, start: NodeIndex) -> HashMap<NodeIndex, usize>  {
         let v = q.pop_front().unwrap();
         for n in g.neighbors(v) {
             if !distances.contains_key(&n) {
-                distances.insert(n, distances.get(&v).unwrap()+ 1);
+                distances.insert(n, distances.get(&v).unwrap() + 1);
+                q.push_back(n);
             }
         }
     }
     distances
 }
 
-pub fn calculate_cheats(map: &Map) {
+pub fn get_neighbors((i, j): (usize, usize), height: usize, width: usize) -> Vec<(usize, usize)> {
+    let mut result = vec![];
+    if i > 0 {
+        result.push((i - 1, j));
+    }
+    if j > 0 {
+        result.push((i, j - 1));
+    }
+    if i < height - 1 {
+        result.push((i + 1, j));
+    }
+    if j < width - 1 {
+        result.push((i, j + 1));
+    }
+    result
+}
+
+pub fn calculate_improvements(map: &Map) -> HashMap<((usize, usize), (usize, usize)), usize> {
     let mut indices = HashMap::new();
     let g = &map.g;
     for node in g.node_indices() {
@@ -98,15 +118,32 @@ pub fn calculate_cheats(map: &Map) {
     }
     let forward_distances = run_search(map, *indices.get(&map.start).unwrap());
     let reverse_distances = run_search(map, *indices.get(&map.end).unwrap());
-
-    let baseline = forward_distances.get(indices.get(&map.end).unwrap()).unwrap();
-
+    let baseline = *forward_distances.get(indices.get(&map.end).unwrap()).unwrap();
+    let mut improvements = HashMap::new();
     for i in 0..map.height {
         for j in 0..map.width {
             if !indices.contains_key(&(i, j)) {
                 // we can try to cheat by skipping this wall
+                let neighbors = get_neighbors((i, j), map.height, map.width);
+                for m in 0..neighbors.len() {
+                    for n in 0..neighbors.len() {
+                        let (i1, j1) = neighbors[m];
+                        let (i2, j2) = neighbors[n];
+                        if (i1, j1) != (i2, j2) 
+                            && indices.contains_key(&(i1, j1))
+                            && indices.contains_key(&(i2, j2))
+                             {
+                            let mut dist = *forward_distances.get(indices.get(&(i1, j1)).unwrap()).unwrap();
+                            dist += 2;
+                            dist += reverse_distances.get(indices.get(&(i2, j2)).unwrap()).unwrap();
+                            if baseline > dist {
+                                improvements.insert(((i1, j1), (i2, j2)), baseline - dist);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-
+    improvements
 }

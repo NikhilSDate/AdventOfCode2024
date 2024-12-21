@@ -4,9 +4,9 @@ mod day13;
 mod day19;
 mod day20;
 
-use day20::{read_input, build_graph};
+use day20::{build_graph, calculate_improvements, read_input};
 fn main() {
     let chars = read_input();
     let map = build_graph(chars);
-    dbg!(map);
+    calculate_improvements(&map);
 }
