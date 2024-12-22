@@ -2,6 +2,7 @@ use graph::UnGraph;
 use petgraph::algo::*;
 use petgraph::graph::NodeIndex;
 use petgraph::*;
+use std::cmp::min;
 use std::collections::{HashMap, VecDeque};
 use std::fs;
 
@@ -12,11 +13,10 @@ pub struct Map {
     end: (usize, usize),
     height: usize,
     width: usize,
-
 }
 
 pub fn read_input() -> Vec<Vec<char>> {
-    let contents = fs::read_to_string("data/day20/example.txt").unwrap();
+    let contents = fs::read_to_string("data/day20/data.txt").unwrap();
     let split = contents.split('\n');
     let mut map: Vec<Vec<char>> = Vec::new();
     let mut lidx = 0;
@@ -42,7 +42,7 @@ pub fn build_graph(map: Vec<Vec<char>>) -> Map {
                 start = (i, j);
             }
             if map[i][j] == 'E' {
-                end = (i, j);                
+                end = (i, j);
             }
             if map[i][j] == '.' || map[i][j] == 'S' || map[i][j] == 'E' {
                 indices.insert((i, j), g.add_node((i, j)));
@@ -55,7 +55,7 @@ pub fn build_graph(map: Vec<Vec<char>>) -> Map {
             if i > 0 && map[i][j] == '.' && map[i - 1][j] == '.' {
                 g.add_edge(indices[&(i, j)], indices[&(i - 1, j)], ());
             }
-            if j > 0 && map[i][j] == '.' && map[i][j - 1]  == '.' {
+            if j > 0 && map[i][j] == '.' && map[i][j - 1] == '.' {
                 g.add_edge(indices[&(i, j)], indices[&(i, j - 1)], ());
             }
             if i < map.len() - 1 && map[i][j] == '.' && map[i + 1][j] == '.' {
@@ -71,11 +71,11 @@ pub fn build_graph(map: Vec<Vec<char>>) -> Map {
         start,
         end,
         height: map.len(),
-        width: map[0].len()
+        width: map[0].len(),
     }
 }
 
-pub fn run_search(map: &Map, start: NodeIndex) -> HashMap<NodeIndex, usize>  {
+pub fn run_search(map: &Map, start: NodeIndex) -> HashMap<NodeIndex, usize> {
     let mut distances = HashMap::new();
     let g = &map.g;
     let mut q = VecDeque::new();
@@ -118,7 +118,9 @@ pub fn calculate_improvements(map: &Map) -> HashMap<((usize, usize), (usize, usi
     }
     let forward_distances = run_search(map, *indices.get(&map.start).unwrap());
     let reverse_distances = run_search(map, *indices.get(&map.end).unwrap());
-    let baseline = *forward_distances.get(indices.get(&map.end).unwrap()).unwrap();
+    let baseline = *forward_distances
+        .get(indices.get(&map.end).unwrap())
+        .unwrap();
     let mut improvements = HashMap::new();
     for i in 0..map.height {
         for j in 0..map.width {
@@ -129,13 +131,17 @@ pub fn calculate_improvements(map: &Map) -> HashMap<((usize, usize), (usize, usi
                     for n in 0..neighbors.len() {
                         let (i1, j1) = neighbors[m];
                         let (i2, j2) = neighbors[n];
-                        if (i1, j1) != (i2, j2) 
+                        if (i1, j1) != (i2, j2)
                             && indices.contains_key(&(i1, j1))
                             && indices.contains_key(&(i2, j2))
-                             {
-                            let mut dist = *forward_distances.get(indices.get(&(i1, j1)).unwrap()).unwrap();
+                        {
+                            let mut dist = *forward_distances
+                                .get(indices.get(&(i1, j1)).unwrap())
+                                .unwrap();
                             dist += 2;
-                            dist += reverse_distances.get(indices.get(&(i2, j2)).unwrap()).unwrap();
+                            dist += reverse_distances
+                                .get(indices.get(&(i2, j2)).unwrap())
+                                .unwrap();
                             if baseline > dist {
                                 improvements.insert(((i1, j1), (i2, j2)), baseline - dist);
                             }
@@ -146,4 +152,63 @@ pub fn calculate_improvements(map: &Map) -> HashMap<((usize, usize), (usize, usi
         }
     }
     improvements
+}
+
+pub fn calculate_long_cheat_improvements(
+    map: &Map,
+    limit: usize,
+) -> HashMap<((usize, usize), (usize, usize)), usize> {
+    let mut indices = HashMap::new();
+    let g = &map.g;
+    for node in g.node_indices() {
+        indices.insert(g.node_weight(node).unwrap(), node);
+    }
+    let forward_distances = run_search(map, *indices.get(&map.start).unwrap());
+    let reverse_distances = run_search(map, *indices.get(&map.end).unwrap());
+    let baseline = *forward_distances
+        .get(indices.get(&map.end).unwrap())
+        .unwrap();
+    let mut improvements = HashMap::new();
+
+    // start of cheat
+    for i1 in 0..map.height {
+        for j1 in 0..map.width {
+            if !indices.contains_key(&(i1, j1)) {
+                continue;
+            }
+            for i2 in i1 - min(limit, i1)..i1 + limit + 1 {
+                for j2 in j1 - min(limit, j1)..j1 + limit + 1 {
+                    if !indices.contains_key(&(i2, j2)) {
+                        continue;
+                    }
+                    let manhattan = i1.abs_diff(i2) + j1.abs_diff(j2);
+                    if manhattan > limit {
+                        continue;
+                    }
+                    let mut dist = *forward_distances
+                        .get(indices.get(&(i1, j1)).unwrap())
+                        .unwrap();
+                    dist += manhattan;
+                    dist += reverse_distances
+                        .get(indices.get(&(i2, j2)).unwrap())
+                        .unwrap();
+                    if baseline > dist {
+                        improvements.insert(((i1, j1), (i2, j2)), baseline - dist);
+                    }
+                }
+            }
+        }
+    }
+
+    improvements
+}
+
+pub fn count_improvements(improvements: HashMap<((usize, usize), (usize, usize)), usize>) -> u32 {
+    let mut count = 0;
+    for improvement in improvements {
+        if improvement.1 >= 100 {
+            count += 1;
+        }
+    }
+    count
 }
