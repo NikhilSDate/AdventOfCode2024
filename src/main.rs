@@ -3,12 +3,11 @@ mod day12;
 mod day13;
 mod day19;
 mod day20;
+mod day22;
 
-use day20::{build_graph, calculate_improvements, calculate_long_cheat_improvements, count_improvements, read_input};
+use day22::{calc_sequence_prices, calc_sum, calculate_best_profit, read_input};
 fn main() {
-    let chars = read_input();
-    let map = build_graph(chars);
-    let improvements = calculate_long_cheat_improvements(&map, 20);
-    let count = count_improvements(improvements);
-    dbg!(count);
+    let nums = read_input("data/day22/data.txt");
+    let best_profit = calculate_best_profit(&nums);
+    dbg!(best_profit);
 }
