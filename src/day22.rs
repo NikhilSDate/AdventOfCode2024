@@ -73,20 +73,14 @@ pub fn calculate_best_profit(nums: &Vec<u64>) -> i64 {
         .iter()
         .map(|n| calc_sequence_prices(*n, 2000))
         .collect();
-    let mut best_profit = 0;
-    for a in -9..10 {
-        for b in -9..10 {
-            for c in -9..10 {
-                for d in -9..10 {
-                    let sequence: Sequence = (a, b, c, d);
-                    let profit: i64 = price_maps.iter().map(|m| match m.get(&sequence) {
-                        Some(val) => *val,
-                        None => 0,
-                    }).sum();
-                    best_profit = max(profit, best_profit);
-                }
+    let mut full_map = HashMap::new();
+    for map in &price_maps {
+        for k in map.keys() {
+            if !full_map.contains_key(k) {
+                full_map.insert(k, 0);
             }
+            full_map.insert(k, full_map.get(k).unwrap() + map.get(k).unwrap());
         }
     }
-    best_profit
+    *full_map.values().max().unwrap()
 }
